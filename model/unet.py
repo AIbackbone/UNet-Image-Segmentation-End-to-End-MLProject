@@ -6,10 +6,13 @@
 # internal
 from .base_model import BaseModel
 from dataloader.dataloader import DataLoader
+from utils.logger import get_logger
 
 # external
 import tensorflow as tf
 from tensorflow_examples.models.pix2pix import pix2pix
+
+LOG = get_logger('unet')
 
 
 class UNet(BaseModel):
@@ -36,11 +39,14 @@ class UNet(BaseModel):
 
     def load_data(self):
         """Loads and Preprocess data """
+        LOG.info(f'Loading {self.config.data.path} dataset...' )
         self.dataset, self.info = DataLoader().load_data(self.config.data)
         self._preprocess_data()
 
+
     def _preprocess_data(self):
         """ Splits into training and test and set training parameters"""
+        LOG.info('Splitting and shuffling dataset...')
         train = self.dataset['train'].map(self._load_image_train, num_parallel_calls=tf.data.experimental.AUTOTUNE)
         test = self.dataset['test'].map(self._load_image_test)
 
@@ -140,11 +146,15 @@ class UNet(BaseModel):
 
         self.model = tf.keras.Model(inputs=inputs, outputs=x)
 
+        LOG.info('Keras Model was built successfully')
+
     def train(self):
         """Compiles and trains the model"""
         self.model.compile(optimizer=self.config.train.optimizer.type,
                            loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
                            metrics=self.config.train.metrics)
+
+        LOG.info('Training started')
 
         model_history = self.model.fit(self.train_dataset, epochs=self.epoches,
                                        steps_per_epoch=self.steps_per_epoch,
@@ -155,50 +165,16 @@ class UNet(BaseModel):
 
     def evaluate(self):
         """Predicts resuts for the test dataset"""
+
         predictions = []
-        for image, mask in self.dataset.take(1):
+        LOG.info(f'Predicting segmentation map for test dataset')
+
+        for im in self.test_dataset.as_numpy_iterator():
+            DataLoader().validate_schema(im[0])
+            break
+
+        for image, mask in self.test_dataset:
+            tf.print(image)
+            #LOG.info(f'Predicting segmentation map {image}')
             predictions.append(self.model.predict(image))
-
         return predictions
-
-
-    def distributed_train(self):
-        mirrored_strategy = tf.distribute.MirroredStrategy(devices=["/gpu:0", "/gpu:1"])
-        with mirrored_strategy.scope():
-            self.model = tf.keras.Model(inputs=inputs, outputs=x)
-            self.model.compile(...)
-            self.model.fit(...)
-
-
-        os.environ["TF_CONFIG"] = json.dumps(
-            {
-                "cluster":{
-                    "worker": ["host1:port", "host2:port", "host3:port"]
-                },
-                "task":{
-                     "type": "worker",
-                     "index": 1
-                }
-            }
-        )
-
-        multi_worker_mirrored_strategy = tf.distribute.experimental.MultiWorkerMirroredStrategy()
-        with multi_worker_mirrored_strategy.scope():
-            self.model = tf.keras.Model(inputs=inputs, outputs=x)
-            self.model.compile(...)
-            self.model.fit(...)
-
-        parameter_server_strategy = tf.distribute.experimental.ParameterServerStrategy()
-
-        os.environ["TF_CONFIG"] = json.dumps(
-            {
-                "cluster": {
-                    "worker": ["host1:port", "host2:port", "host3:port"],
-                    "ps":  ["host4:port", "host5:port"]
-                },
-                "task": {
-                    "type": "worker",
-                    "index": 1
-                }
-            }
-        )
