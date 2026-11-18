@@ -7,4 +7,4 @@ The project involves developing an end-to-end machine learning pipeline to imple
 ## Additional Details:
 
 The application contains modular scripts for its main functionalities such as: data loading, model architecture, and model execution. 
-This project carries out distinct phases related to model building, data manipulation and DevOPs such as loading, normalization, unit test, type checking, logging, debugging, Flask API implementation, OOP principles and so more
+This project carries out distinct phases related to model building, data manipulation and DevOps such as loading, normalization, unit test, type checking, logging, debugging, Flask API implementation, Nginx, Docker, Kubernetes and OOP principles. 
